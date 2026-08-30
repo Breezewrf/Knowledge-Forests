@@ -1,0 +1,9 @@
+{
+  "id": "knowledge-forests",
+  "name": "Knowledge Forests",
+  "version": "0.3.0",
+  "minAppVersion": "1.11.4",
+  "description": "Plant knowledge seeds, grow them from note headings, arrange forests, and sync with GitHub.",
+  "author": "Knowledge Forests",
+  "isDesktopOnly": true
+}

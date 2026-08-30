@@ -1,0 +1,22 @@
+{
+  "name": "knowledge-forests",
+  "version": "0.3.0",
+  "description": "Grow manually planted knowledge seeds inside Obsidian.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit && node esbuild.config.mjs production",
+    "test": "vitest run",
+    "deploy": "npm run build && node scripts/deploy.mjs"
+  },
+  "keywords": ["obsidian", "knowledge-management", "visualization"],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "builtin-modules": "^4.0.0",
+    "esbuild": "^0.24.2",
+    "obsidian": "latest",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

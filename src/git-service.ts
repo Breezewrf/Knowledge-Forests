@@ -49,7 +49,10 @@ export class GitService {
     return { repository: true, dirty, ahead, behind, conflicts: conflicts.length };
   }
 
-  async sync(onProgress?: (progress: SyncProgress) => void): Promise<SyncResult> {
+  async sync(
+    onProgress?: (progress: SyncProgress) => void,
+    options: { allowUnrelatedHistories?: boolean } = {}
+  ): Promise<SyncResult> {
     this.validateSettings();
     const authentication = await this.createAuthentication();
     try {
@@ -84,7 +87,29 @@ export class GitService {
         [0, 1]
       );
       if (remoteBranch.code === 0) {
-        const merge = await this.git(["merge", "--no-edit", `origin/${MAIN_BRANCH}`], [0, 1, 128]);
+        const remoteRef = `origin/${MAIN_BRANCH}`;
+        const mergeBase = await this.git(["merge-base", "HEAD", remoteRef], [0, 1]);
+        const historiesAreUnrelated = mergeBase.code === 1;
+        if (historiesAreUnrelated && !options.allowUnrelatedHistories) {
+          onProgress?.({
+            phase: "conflict",
+            message: "Local and remote histories started separately — confirmation required",
+            progress: 0.5
+          });
+          return {
+            status: "unrelated",
+            committed,
+            message: "The current vault and remote repository have separate Git histories.",
+            conflicts: []
+          };
+        }
+
+        // Override a user-level merge.ff=only setting: synchronization must be
+        // able to create a merge commit when both devices have new commits.
+        const mergeArgs = ["merge", "--no-edit", "--ff"];
+        if (historiesAreUnrelated) mergeArgs.push("--allow-unrelated-histories");
+        mergeArgs.push(remoteRef);
+        const merge = await this.git(mergeArgs, [0, 1, 128]);
         if (merge.code !== 0) {
           const conflicts = await this.getConflicts();
           if (conflicts.length > 0) {

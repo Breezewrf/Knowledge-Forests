@@ -95,7 +95,7 @@ export interface GitConflict {
 }
 
 export interface SyncResult {
-  status: "complete" | "conflict";
+  status: "complete" | "conflict" | "unrelated";
   committed: boolean;
   message: string;
   conflicts: GitConflict[];

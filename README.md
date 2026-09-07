@@ -111,6 +111,8 @@ Save local changes → Merge remote updates → Upload
 
 The status panel reports **Synced**, **Local changes**, **Remote updates available**, **Syncing**, or **Conflict**. Non-overlapping changes from different devices merge automatically.
 
+If a device initialized the same notes independently, the local and remote branches may have no common Git history. Knowledge Forests detects this case and asks for confirmation before combining them. Verify the remote repository in the prompt; after confirmation, non-overlapping files are merged and overlapping files use the normal conflict resolver. Nothing is uploaded before confirmation.
+
 If two devices edit overlapping content, synchronization pauses and opens a resolver:
 
 - Text files: keep the current device, keep the remote version, or edit a combined result.

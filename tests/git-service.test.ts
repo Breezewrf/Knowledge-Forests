@@ -92,4 +92,65 @@ describe("GitService", () => {
     expect(uploaded).toContain("device A");
     expect(await service.remoteHasUpdates()).toBe(false);
   }, 20_000);
+
+  it("requires confirmation before merging unrelated local and remote histories", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "knowledge-forests-unrelated-"));
+    const vault = path.join(root, "vault");
+    const remote = path.join(root, "remote.git");
+    const remoteWorktree = path.join(root, "remote-worktree");
+    await mkdir(vault);
+    execFileSync("git", ["init", "--bare", remote]);
+    execFileSync("git", ["clone", remote, remoteWorktree]);
+    execFileSync("git", ["switch", "-c", "main"], { cwd: remoteWorktree });
+    execFileSync("git", ["config", "user.name", "Remote Device"], { cwd: remoteWorktree });
+    execFileSync("git", ["config", "user.email", "remote@example.com"], { cwd: remoteWorktree });
+    await writeFile(path.join(remoteWorktree, "Remote.md"), "# Remote note\n");
+    await writeFile(path.join(remoteWorktree, "Shared.md"), "# Shared note from remote\n");
+    execFileSync("git", ["add", "Remote.md", "Shared.md"], { cwd: remoteWorktree });
+    execFileSync("git", ["commit", "-m", "remote root commit"], { cwd: remoteWorktree });
+    execFileSync("git", ["push", "-u", "origin", "main"], { cwd: remoteWorktree });
+    await writeFile(path.join(vault, "Local.md"), "# Local note\n");
+    await writeFile(path.join(vault, "Shared.md"), "# Shared note from local\n");
+
+    const adapter = {
+      exists: async (relative: string) => {
+        try { await readFile(path.join(vault, relative)); return true; } catch { return false; }
+      },
+      read: async (relative: string) => readFile(path.join(vault, relative), "utf8"),
+      write: async (relative: string, data: string) => { await writeFile(path.join(vault, relative), data); }
+    } as unknown as DataAdapter;
+    const settings = {
+      seedFolder: "Knowledge Forests/Seeds",
+      forestFolder: "Knowledge Forests/Forests",
+      templateFolder: "Templates",
+      h1Weight: 1,
+      h2Weight: 0.5,
+      thresholds: { sprout: 0.5, seedling: 5, youngTree: 15, matureTree: 40 },
+      gitRemoteUrl: remote,
+      gitAuthMode: "system" as const,
+      gitAuthorName: "Knowledge Forester",
+      gitAuthorEmail: "forester@example.com",
+      commitMessageTemplate: "forest sync: {{datetime}}",
+      heatmapDays: 90
+    };
+    const service = new GitService(vault, adapter, settings);
+
+    const confirmationRequired = await service.sync();
+    expect(confirmationRequired.status).toBe("unrelated");
+    expect(execFileSync("git", ["--git-dir", remote, "rev-list", "--count", "main"], { encoding: "utf8" }).trim()).toBe("1");
+
+    execFileSync("git", ["config", "merge.ff", "only"], { cwd: vault });
+    const merged = await service.sync(undefined, { allowUnrelatedHistories: true });
+    expect(merged.status).toBe("conflict");
+    expect(merged.conflicts).toHaveLength(1);
+    expect(merged.conflicts[0].localContent).toContain("from local");
+    expect(merged.conflicts[0].remoteContent).toContain("from remote");
+
+    await service.resolveConflict(merged.conflicts[0], "local");
+    await service.completeConflictResolution();
+    expect(await readFile(path.join(vault, "Local.md"), "utf8")).toContain("Local note");
+    expect(await readFile(path.join(vault, "Remote.md"), "utf8")).toContain("Remote note");
+    expect(execFileSync("git", ["--git-dir", remote, "show", "main:Shared.md"], { encoding: "utf8" })).toContain("from local");
+    expect(execFileSync("git", ["--git-dir", remote, "rev-list", "--count", "main"], { encoding: "utf8" }).trim()).toBe("3");
+  }, 20_000);
 });

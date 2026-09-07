@@ -172,6 +172,7 @@ export class SyncConflictModal extends Modal {
     try {
       await this.onResolve(conflict, resolution, content);
       this.conflicts = await this.onRefresh();
+      this.busy = false;
       this.render();
     } catch (error) {
       new Notice(error instanceof Error ? error.message : String(error), 8000);

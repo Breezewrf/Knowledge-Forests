@@ -362,7 +362,21 @@ export class KnowledgeForestsView extends ItemView {
     button?.addClass("is-syncing");
     button?.toggleAttribute("disabled", true);
     try {
-      const result = await this.plugin.git.sync((progress) => this.setSyncProgress(progress));
+      let result = await this.plugin.git.sync((progress) => this.setSyncProgress(progress));
+      if (result.status === "unrelated") {
+        const confirmed = window.confirm(
+          "This vault and the remote repository have separate Git histories. This usually happens when two devices initialized the same notes independently.\n\nMerge both histories and resolve any overlapping files? Before continuing, verify that the configured remote is the correct notes repository. Nothing has been uploaded yet."
+        );
+        if (!confirmed) {
+          this.syncProgress = null;
+          new Notice("Merge canceled; the local commit was kept and nothing was uploaded.");
+          return;
+        }
+        result = await this.plugin.git.sync(
+          (progress) => this.setSyncProgress(progress),
+          { allowUnrelatedHistories: true }
+        );
+      }
       if (result.status === "conflict") {
         this.openConflictResolver(result.conflicts);
       } else {
